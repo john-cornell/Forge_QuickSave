@@ -1,6 +1,6 @@
-/* QuickMove v1.0.0 */
+/* QuickMove v1.1.0 */
 
-/* checkbox overlay on gallery thumbnails / preview image */
+/* one checkbox per gallery thumbnail only */
 input.quickmove-check {
     position: absolute;
     top: 6px;
@@ -68,6 +68,10 @@ input.quickmove-check {
 
 .quickmove-card.unchecked {
     opacity: 0.45;
+}
+
+.quickmove-card.unchecked .quickmove-tab-check {
+    cursor: pointer;
 }
 
 .quickmove-card img {

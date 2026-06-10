@@ -1,13 +1,15 @@
-// QuickMove v1.0.0 - checkbox overlays on txt2img/img2img gallery images.
-// Checked state is synced with the Python backend (memory + JSON file).
+// QuickMove v1.1.0 - checkbox overlays on txt2img/img2img gallery thumbnails.
+// Three states per image path:
+//   (not in list)  default — unchecked on preview, not on tab
+//   checked=true   selected for move — checked on preview and tab
+//   checked=false  remembered — unchecked/greyed on tab, unchecked on preview
 (function () {
     "use strict";
 
-    const QM_VERSION = "1.0.0";
+    const QM_VERSION = "1.1.0";
     const GALLERY_IDS = ["txt2img_gallery", "img2img_gallery"];
 
-    // key -> checked  (mirrors backend state, keys normalized like Python's
-    // os.path.normcase: lowercase + backslashes on Windows paths)
+    // normKey -> true | false  (false = remembered but unchecked; absent = never added)
     let stateKeys = {};
     let lastFetch = 0;
     let fetching = null;
@@ -17,6 +19,13 @@
             return p.replace(/\//g, "\\").toLowerCase();
         }
         return p;
+    }
+
+    function decodeB64(b64) {
+        const bytes = atob(b64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        return new TextDecoder("utf-8").decode(arr);
     }
 
     function fetchState(force) {
@@ -35,7 +44,12 @@
     }
 
     function sendToggle(path, checked) {
-        stateKeys[normKey(path)] = checked;
+        const key = normKey(path);
+        if (checked) {
+            stateKeys[key] = true;
+        } else if (key in stateKeys) {
+            stateKeys[key] = false;
+        }
         fetch("./quickmove/toggle", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -48,14 +62,25 @@
         return m ? decodeURIComponent(m[1]) : null;
     }
 
-    function ensureCheckbox(img) {
-        const container = img.closest(".thumbnail-item") || img.parentElement;
-        if (!container || container.classList.contains("quickmove-card")) return;
+    function removeDuplicateChecks(path, keepCb) {
+        const key = normKey(path);
+        gradioApp().querySelectorAll("input.quickmove-check").forEach((cb) => {
+            if (cb !== keepCb && normKey(cb.dataset.qmPath || "") === key) {
+                cb.remove();
+            }
+        });
+    }
+
+    function ensureThumbnailCheckbox(thumb) {
+        if (!thumb || thumb.dataset.qmReady === "1") return;
+
+        const img = thumb.querySelector("img");
+        if (!img) return;
 
         const path = extractPath(img);
         if (!path) return;
 
-        let cb = container.querySelector("input.quickmove-check");
+        let cb = thumb.querySelector("input.quickmove-check");
         if (!cb) {
             cb = document.createElement("input");
             cb.type = "checkbox";
@@ -65,15 +90,17 @@
             cb.addEventListener("change", (e) => {
                 e.stopPropagation();
                 sendToggle(cb.dataset.qmPath, cb.checked);
-                syncCheckboxes();
             });
-            if (getComputedStyle(container).position === "static") {
-                container.style.position = "relative";
+            if (getComputedStyle(thumb).position === "static") {
+                thumb.style.position = "relative";
             }
-            container.appendChild(cb);
+            thumb.appendChild(cb);
+            removeDuplicateChecks(path, cb);
         }
+
         cb.dataset.qmPath = path;
-        cb.checked = !!stateKeys[normKey(path)];
+        cb.checked = stateKeys[normKey(path)] === true;
+        thumb.dataset.qmReady = "1";
     }
 
     function syncCheckboxes() {
@@ -81,44 +108,56 @@
         for (const gid of GALLERY_IDS) {
             const gallery = app.querySelector("#" + gid);
             if (!gallery) continue;
-            // thumbnail strip
-            gallery.querySelectorAll(".thumbnail-item img").forEach(ensureCheckbox);
-            // large preview image (when a thumbnail is expanded)
-            gallery
-                .querySelectorAll("img[data-testid='detailed-image']")
-                .forEach(ensureCheckbox);
+            gallery.querySelectorAll(".thumbnail-item").forEach((thumb) => {
+                thumb.dataset.qmReady = "";
+                ensureThumbnailCheckbox(thumb);
+            });
         }
     }
 
-    function scan() {
-        fetchState(false).then(syncCheckboxes);
+    function updateTabCard(cb) {
+        const card = cb.closest(".quickmove-card");
+        if (card) card.classList.toggle("unchecked", !cb.checked);
+    }
+
+    function onTabCheckboxChange(cb) {
+        const path = decodeB64(cb.dataset.qmB64 || "");
+        if (!path) return;
+        sendToggle(path, cb.checked);
+        updateTabCard(cb);
         syncCheckboxes();
     }
 
-    // Called from inline handlers in the QuickMove tab grid (base64 path
-    // avoids any quoting issues in generated HTML).
-    window.quickmoveTabToggle = function (b64, checked, el) {
-        const bytes = atob(b64);
-        const arr = new Uint8Array(bytes.length);
-        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-        const path = new TextDecoder("utf-8").decode(arr);
-        sendToggle(path, checked);
-        const card = el && el.closest(".quickmove-card");
-        if (card) card.classList.toggle("unchecked", !checked);
+    function setupTabDelegation() {
+        const app = gradioApp();
+        if (app.dataset.qmTabDelegation === "1") return;
+        app.dataset.qmTabDelegation = "1";
+        app.addEventListener(
+            "change",
+            (e) => {
+                if (!e.target.classList.contains("quickmove-tab-check")) return;
+                onTabCheckboxChange(e.target);
+            },
+            true
+        );
+    }
+
+    function scan() {
+        setupTabDelegation();
+        fetchState(false).then(syncCheckboxes);
         syncCheckboxes();
-    };
+    }
 
     const register =
         typeof onAfterUiUpdate === "function" ? onAfterUiUpdate : onUiUpdate;
     register(scan);
 
-    // Auto-refresh the QuickMove tab grid whenever the user switches to it.
     if (typeof onUiTabChange === "function") {
         onUiTabChange(function () {
             const app = gradioApp();
             const tab = app.querySelector("#tab_quickmove_tab");
             if (tab && tab.style.display !== "none") {
-                fetchState(true);
+                fetchState(true).then(syncCheckboxes);
                 const btn = app.querySelector("#quickmove_refresh");
                 if (btn) btn.click();
             }

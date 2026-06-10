@@ -20,7 +20,7 @@ from fastapi import Body
 
 from modules import script_callbacks
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(EXT_DIR, "quickmove_config.json")
@@ -79,6 +79,11 @@ _load_state()
 # ----------------------------------------------------------------- operations
 
 def toggle_image(path, checked):
+    """Three stored states for a path:
+    - Not in _items: never selected (default, not shown on tab).
+    - checked=True: selected for move (checked on preview and tab).
+    - checked=False: remembered but excluded from move (greyed on tab, unchecked on preview).
+    """
     with _lock:
         k = _key(path)
         for it in _items:
@@ -192,11 +197,11 @@ def render_grid():
         missing = "" if os.path.isfile(path) else "<span class='quickmove-missing'>missing</span>"
         name = html.escape(os.path.basename(path))
         cards.append(
-            f"<div class='{card_cls}'>"
+            f"<div class='{card_cls}' data-qm-key='{html.escape(_key(path))}'>"
             f"<img src='{url}' loading='lazy' title='{html.escape(path)}'/>"
             f"<label class='quickmove-card-label'>"
-            f"<input type='checkbox' {checked_attr} "
-            f"onchange=\"quickmoveTabToggle('{b64}', this.checked, this)\"/>"
+            f"<input type='checkbox' class='quickmove-tab-check' {checked_attr} "
+            f"data-qm-b64='{b64}'/>"
             f"<span class='quickmove-card-name'>{name}</span>{missing}"
             f"</label></div>"
         )
