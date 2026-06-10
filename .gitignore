@@ -1,0 +1,4 @@
+quickmove_config.json
+quickmove_selected.json
+*.tmp
+__pycache__/

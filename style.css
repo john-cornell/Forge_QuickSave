@@ -1,0 +1,108 @@
+/* QuickMove v1.0.0 */
+
+/* checkbox overlay on gallery thumbnails / preview image */
+input.quickmove-check {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    z-index: 60;
+    cursor: pointer;
+    accent-color: #2563eb;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 4px;
+}
+
+/* QuickMove tab */
+.quickmove-header {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 6px 0 2px 0;
+}
+
+.quickmove-version {
+    font-size: 0.7em;
+    opacity: 0.65;
+    margin-left: 6px;
+}
+
+.quickmove-summary {
+    margin: 6px 0;
+    opacity: 0.8;
+}
+
+.quickmove-empty {
+    padding: 24px;
+    opacity: 0.6;
+    font-style: italic;
+}
+
+.quickmove-status {
+    margin: 4px 0;
+    padding: 6px 10px;
+    border-left: 3px solid #2563eb;
+    background: rgba(37, 99, 235, 0.08);
+}
+
+.quickmove-status.error {
+    border-left-color: #dc2626;
+    background: rgba(220, 38, 38, 0.08);
+}
+
+.quickmove-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.quickmove-card {
+    width: 210px;
+    border: 1px solid var(--border-color-primary, #444);
+    border-radius: 8px;
+    padding: 6px;
+    transition: opacity 0.15s ease;
+}
+
+.quickmove-card.unchecked {
+    opacity: 0.45;
+}
+
+.quickmove-card img {
+    width: 100%;
+    height: 170px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.quickmove-card-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.quickmove-card-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: #2563eb;
+    cursor: pointer;
+}
+
+.quickmove-card-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quickmove-missing {
+    color: #dc2626;
+    font-weight: 600;
+    margin-left: 4px;
+}
