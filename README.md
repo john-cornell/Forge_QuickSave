@@ -1,4 +1,4 @@
-# QuickMove (v1.1.0)
+# QuickMove (v1.3.0)
 
 A Stable Diffusion WebUI **Forge** / A1111 extension that lets you tick generated
 images as they appear and later move all ticked images to a folder of your
@@ -25,6 +25,8 @@ choice in one click — no more saving, hunting and moving files one by one.
     the tab).
 - **Persistent destination folder** stored in `quickmove_config.json` inside
   the extension folder.
+- **Image accordion** — the tab grid lives inside a collapsible accordion
+  whose expand/collapse state is also remembered in `quickmove_config.json`.
 
 ## Install
 
@@ -54,5 +56,5 @@ registered).
 
 ## Version
 
-Version **1.1.0** — shown at the top of the QuickMove tab and logged to the
+Version **1.3.0** — shown at the top of the QuickMove tab and logged to the
 browser console and Forge console on load.

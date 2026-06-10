@@ -5,14 +5,18 @@ Checked images are tracked in memory AND persisted to a JSON file inside the
 extension folder (crash-safe). A dedicated "QuickMove" tab shows everything
 that has been checked across any number of generation runs, and lets you move
 all checked images to a configured destination folder in one click.
+
+The tab grid is rendered entirely by javascript/quickmove.js from the
+/quickmove/state endpoint, so there is exactly one source of truth for
+checkbox state.
 """
 
-import base64
 import html
 import json
 import os
 import shutil
 import threading
+import time
 import urllib.parse
 
 import gradio as gr
@@ -20,7 +24,7 @@ from fastapi import Body
 
 from modules import script_callbacks
 
-VERSION = "1.1.0"
+VERSION = "1.3.0"
 
 EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(EXT_DIR, "quickmove_config.json")
@@ -61,12 +65,23 @@ def _save_state():
     _save_json(STATE_PATH, {"version": VERSION, "items": _items})
 
 
+def get_config():
+    return _load_json(CONFIG_PATH, {})
+
+
+def set_config_value(key, value):
+    cfg = _load_json(CONFIG_PATH, {})
+    cfg[key] = value
+    cfg["version"] = VERSION
+    _save_json(CONFIG_PATH, cfg)
+
+
 def get_destination():
-    return _load_json(CONFIG_PATH, {}).get("destination", "")
+    return get_config().get("destination", "")
 
 
 def set_destination(dest):
-    _save_json(CONFIG_PATH, {"version": VERSION, "destination": dest.strip()})
+    set_config_value("destination", dest.strip())
 
 
 def _key(path):
@@ -118,7 +133,7 @@ def clear_all():
         count = len(_items)
         _items.clear()
         _save_state()
-    return f"Cleared all {count} image(s) - everything is now unchecked."
+    return f"Cleared all {count} image(s)."
 
 
 def move_checked(dest):
@@ -170,47 +185,12 @@ def _unique_path(dest_dir, name):
 
 # -------------------------------------------------------------------- tab UI
 
-def render_grid():
-    with _lock:
-        items = [dict(it) for it in _items]
-
-    checked_count = sum(1 for it in items if it["checked"])
-    summary = (
-        f"<div class='quickmove-summary'>{len(items)} image(s) listed, "
-        f"{checked_count} checked</div>"
-    )
-
-    if not items:
-        return summary + (
-            "<div class='quickmove-empty'>No images selected yet. "
-            "Tick the checkbox on generated images in the txt2img / img2img "
-            "galleries to add them here.</div>"
-        )
-
-    cards = []
-    for it in items:
-        path = it["path"]
-        b64 = base64.b64encode(path.encode("utf-8")).decode("ascii")
-        url = "./file=" + urllib.parse.quote(path.replace("\\", "/"), safe="/:")
-        checked_attr = "checked" if it["checked"] else ""
-        card_cls = "quickmove-card" + ("" if it["checked"] else " unchecked")
-        missing = "" if os.path.isfile(path) else "<span class='quickmove-missing'>missing</span>"
-        name = html.escape(os.path.basename(path))
-        cards.append(
-            f"<div class='{card_cls}' data-qm-key='{html.escape(_key(path))}'>"
-            f"<img src='{url}' loading='lazy' title='{html.escape(path)}'/>"
-            f"<label class='quickmove-card-label'>"
-            f"<input type='checkbox' class='quickmove-tab-check' {checked_attr} "
-            f"data-qm-b64='{b64}'/>"
-            f"<span class='quickmove-card-name'>{name}</span>{missing}"
-            f"</label></div>"
-        )
-    return summary + "<div class='quickmove-grid'>" + "".join(cards) + "</div>"
-
-
 def _status(msg):
+    """Status HTML. A hidden timestamp guarantees the DOM changes on every
+    update, which the JS mutation observer uses to re-render the grid."""
     cls = "quickmove-status error" if msg.startswith("ERROR") else "quickmove-status"
-    return f"<div class='{cls}'>{html.escape(msg)}</div>"
+    stamp = f"<span style='display:none'>{time.time()}</span>"
+    return f"<div class='{cls}'>{html.escape(msg)}{stamp}</div>"
 
 
 def on_ui_tabs():
@@ -232,9 +212,9 @@ def on_ui_tabs():
             clear_unchecked_btn = gr.Button("Clear Unchecked")
             uncheck_all_btn = gr.Button("Uncheck All")
             clear_all_btn = gr.Button("Clear All", variant="stop")
-            refresh_btn = gr.Button("Refresh", elem_id="quickmove_refresh")
-        status = gr.HTML("")
-        grid = gr.HTML(render_grid())
+            refresh_btn = gr.Button("Refresh")
+        status = gr.HTML("", elem_id="quickmove_status")
+        gr.HTML("<div id='quickmove_grid'></div>")
 
         def do_save(dest):
             set_destination(dest)
@@ -242,32 +222,43 @@ def on_ui_tabs():
 
         def do_move(dest):
             set_destination(dest)
-            return _status(move_checked(dest)), render_grid()
-
-        def do(fn):
-            return _status(fn()), render_grid()
+            return _status(move_checked(dest))
 
         save_btn.click(do_save, inputs=[dest_box], outputs=[status])
-        move_btn.click(do_move, inputs=[dest_box], outputs=[status, grid])
-        clear_unchecked_btn.click(lambda: do(clear_unchecked), outputs=[status, grid])
-        uncheck_all_btn.click(lambda: do(uncheck_all), outputs=[status, grid])
-        clear_all_btn.click(lambda: do(clear_all), outputs=[status, grid])
-        refresh_btn.click(lambda: ("", render_grid()), outputs=[status, grid])
+        move_btn.click(do_move, inputs=[dest_box], outputs=[status])
+        clear_unchecked_btn.click(lambda: _status(clear_unchecked()), outputs=[status])
+        uncheck_all_btn.click(lambda: _status(uncheck_all()), outputs=[status])
+        clear_all_btn.click(lambda: _status(clear_all()), outputs=[status])
+        refresh_btn.click(lambda: _status("Refreshed."), outputs=[status])
 
     return [(ui, "QuickMove", "quickmove_tab")]
 
 
 # ----------------------------------------------------------------------- API
 
+def _item_dto(it):
+    path = it["path"]
+    return {
+        "path": path,
+        "key": _key(path),
+        "checked": bool(it["checked"]),
+        "name": os.path.basename(path),
+        "url": "./file=" + urllib.parse.quote(path.replace("\\", "/"), safe="/:"),
+        "missing": not os.path.isfile(path),
+    }
+
+
 def on_app_started(demo, app):
     @app.get("/quickmove/state")
     async def quickmove_state():
         with _lock:
-            items = [
-                {"path": it["path"], "checked": it["checked"], "key": _key(it["path"])}
-                for it in _items
-            ]
-        return {"version": VERSION, "destination": get_destination(), "items": items}
+            items = [_item_dto(it) for it in _items]
+        return {
+            "version": VERSION,
+            "destination": get_destination(),
+            "accordion_open": bool(get_config().get("accordion_open", True)),
+            "items": items,
+        }
 
     @app.post("/quickmove/toggle")
     async def quickmove_toggle(payload: dict = Body(...)):
@@ -275,6 +266,12 @@ def on_app_started(demo, app):
         if path:
             toggle_image(path, bool(payload.get("checked")))
         return {"ok": bool(path)}
+
+    @app.post("/quickmove/config")
+    async def quickmove_config(payload: dict = Body(...)):
+        if "accordion_open" in payload:
+            set_config_value("accordion_open", bool(payload["accordion_open"]))
+        return {"ok": True}
 
 
 script_callbacks.on_ui_tabs(on_ui_tabs)

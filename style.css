@@ -1,4 +1,4 @@
-/* QuickMove v1.1.0 */
+/* QuickMove v1.3.0 */
 
 /* one checkbox per gallery thumbnail only */
 input.quickmove-check {
@@ -49,6 +49,48 @@ input.quickmove-check {
 .quickmove-status.error {
     border-left-color: #dc2626;
     background: rgba(220, 38, 38, 0.08);
+}
+
+/* accordion around the tab grid (open state persisted to disk) */
+.quickmove-accordion {
+    border: 1px solid var(--border-color-primary, #444);
+    border-radius: 8px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.quickmove-acc-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    background: var(--background-fill-secondary, rgba(128, 128, 128, 0.08));
+}
+
+.quickmove-acc-header:hover {
+    background: var(--background-fill-primary, rgba(128, 128, 128, 0.15));
+}
+
+.quickmove-acc-arrow {
+    display: inline-block;
+    font-size: 0.75em;
+    transition: transform 0.15s ease;
+}
+
+.quickmove-accordion.open .quickmove-acc-arrow {
+    transform: rotate(90deg);
+}
+
+.quickmove-acc-body {
+    display: none;
+    padding: 10px 12px;
+}
+
+.quickmove-accordion.open .quickmove-acc-body {
+    display: block;
 }
 
 .quickmove-grid {
