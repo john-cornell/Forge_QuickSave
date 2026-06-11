@@ -24,7 +24,7 @@ from fastapi import Body
 
 from modules import script_callbacks
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(EXT_DIR, "quickmove_config.json")

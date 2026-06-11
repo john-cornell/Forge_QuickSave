@@ -1,4 +1,4 @@
-/* QuickMove v1.4.0 */
+/* QuickMove v1.5.0 */
 
 /* self-drawn check button overlaid on gallery thumbnails */
 .quickmove-check {
@@ -35,6 +35,18 @@
     background: #2563eb;
     border-color: #2563eb;
     color: #ffffff;
+}
+
+/* single button next to the enlarged preview image: right side, centred */
+.quickmove-check.preview-check {
+    top: 50%;
+    left: auto;
+    right: 12px;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    font-size: 22px;
+    z-index: 120;
 }
 
 /* QuickMove tab */

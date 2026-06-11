@@ -1,4 +1,4 @@
-// QuickMove v1.4.0
+// QuickMove v1.5.0
 // Preview: a self-drawn check button (NOT a native checkbox) overlaid on each
 // gallery thumbnail. We fully own its state and rendering, so Gradio can
 // never swallow the click or reset the tick. Click toggles on/off.
@@ -13,7 +13,7 @@
 (function () {
     "use strict";
 
-    const QM_VERSION = "1.4.0";
+    const QM_VERSION = "1.5.0";
     const GALLERY_IDS = ["txt2img_gallery", "img2img_gallery"];
 
     // normKey -> {path, key, checked, name, url, missing}
@@ -116,6 +116,14 @@
         return btn;
     }
 
+    function updateButton(btn, path) {
+        if (btn.dataset.qmPath !== path) btn.dataset.qmPath = path;
+        const want = isChecked(path);
+        if (btn.classList.contains("checked") !== want) {
+            btn.classList.toggle("checked", want);
+        }
+    }
+
     // Idempotent: only writes to the DOM when something actually changed,
     // so repeated calls never cause flicker or mutation loops.
     function syncGallery() {
@@ -123,13 +131,27 @@
         for (const gid of GALLERY_IDS) {
             const gallery = app.querySelector("#" + gid);
             if (!gallery) continue;
+
+            const preview = gallery.querySelector(".preview");
+            const previewOpen = !!(preview && preview.offsetParent !== null);
+
+            // Never decorate the tiny strip thumbnails inside the preview.
+            gallery
+                .querySelectorAll(".preview .thumbnail-item .quickmove-check")
+                .forEach((b) => b.remove());
+
+            // Grid thumbnails: overlay button only while no preview covers them.
             gallery.querySelectorAll(".thumbnail-item").forEach((thumb) => {
+                if (thumb.closest(".preview")) return;
+                let btn = thumb.querySelector(".quickmove-check");
+                if (previewOpen) {
+                    if (btn) btn.remove();
+                    return;
+                }
                 const img = thumb.querySelector("img");
                 if (!img) return;
                 const path = extractPath(img);
                 if (!path) return;
-
-                let btn = thumb.querySelector(".quickmove-check");
                 if (!btn) {
                     btn = makeCheckButton();
                     if (getComputedStyle(thumb).position === "static") {
@@ -137,12 +159,34 @@
                     }
                     thumb.appendChild(btn);
                 }
-                if (btn.dataset.qmPath !== path) btn.dataset.qmPath = path;
-                const want = isChecked(path);
-                if (btn.classList.contains("checked") !== want) {
-                    btn.classList.toggle("checked", want);
-                }
+                updateButton(btn, path);
             });
+
+            // Preview open: ONE button next to the big image, right of it and
+            // vertically centred. It always tracks the displayed image.
+            let pbtn = gallery.querySelector(".quickmove-check.preview-check");
+            if (previewOpen) {
+                const img =
+                    preview.querySelector("img[data-testid='detailed-image']") ||
+                    preview.querySelector(".image-button img") ||
+                    preview.querySelector("img");
+                const path = img ? extractPath(img) : null;
+                if (!path) {
+                    if (pbtn) pbtn.remove();
+                } else {
+                    if (!pbtn) {
+                        pbtn = makeCheckButton();
+                        pbtn.classList.add("preview-check");
+                        if (getComputedStyle(preview).position === "static") {
+                            preview.style.position = "relative";
+                        }
+                        preview.appendChild(pbtn);
+                    }
+                    updateButton(pbtn, path);
+                }
+            } else if (pbtn) {
+                pbtn.remove();
+            }
         }
     }
 
@@ -299,6 +343,20 @@
         if (container && !container.dataset.qmInit) {
             container.dataset.qmInit = "1";
             renderTabGrid();
+        }
+
+        // Selecting a different image only changes the preview img src
+        // (attribute mutation), which may not fire onAfterUiUpdate - resync
+        // shortly after any click inside a gallery.
+        for (const gid of GALLERY_IDS) {
+            const gallery = app.querySelector("#" + gid);
+            if (gallery && !gallery.dataset.qmClickSync) {
+                gallery.dataset.qmClickSync = "1";
+                gallery.addEventListener("click", () => {
+                    setTimeout(syncGallery, 100);
+                    setTimeout(syncGallery, 400);
+                });
+            }
         }
 
         if (!stateLoaded) {

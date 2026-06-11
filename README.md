@@ -1,4 +1,4 @@
-# QuickMove (v1.4.0)
+# QuickMove (v1.5.0)
 
 A Stable Diffusion WebUI **Forge** / A1111 extension that lets you tick generated
 images as they appear and later move all ticked images to a folder of your
@@ -7,7 +7,9 @@ choice in one click — no more saving, hunting and moving files one by one.
 ## Features
 
 - **Check button on every generated image** in the txt2img and img2img
-  gallery thumbnails — click to mark/unmark an image for the batch move.
+  galleries — click to mark/unmark an image for the batch move. When the
+  enlarged preview is open, a single button sits to the right of the image,
+  vertically centred, and always tracks the displayed image.
 - **Crash-safe**: the checked list is kept in memory *and* written to
   `quickmove_selected.json` inside the extension folder on every change, so a
   Forge crash loses nothing.
@@ -57,5 +59,5 @@ registered).
 
 ## Version
 
-Version **1.4.0** — shown at the top of the QuickMove tab and logged to the
+Version **1.5.0** — shown at the top of the QuickMove tab and logged to the
 browser console and Forge console on load.
