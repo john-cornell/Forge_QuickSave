@@ -24,7 +24,7 @@ from fastapi import Body
 
 from modules import script_callbacks
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(EXT_DIR, "quickmove_config.json")
@@ -116,7 +116,7 @@ def uncheck_all():
         for it in _items:
             it["checked"] = False
         _save_state()
-    return "Unchecked all images (still listed - use 'Clear Unchecked' to remove)."
+    return "Unchecked all images (still listed as excluded - use 'Clear Unchecked' to remove)."
 
 
 def clear_unchecked():

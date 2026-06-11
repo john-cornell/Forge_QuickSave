@@ -1,18 +1,40 @@
-/* QuickMove v1.3.0 */
+/* QuickMove v1.4.0 */
 
-/* one checkbox per gallery thumbnail only */
-input.quickmove-check {
+/* self-drawn check button overlaid on gallery thumbnails */
+.quickmove-check {
     position: absolute;
     top: 6px;
     left: 6px;
-    width: 22px;
-    height: 22px;
-    margin: 0;
+    width: 26px;
+    height: 26px;
     z-index: 60;
     cursor: pointer;
-    accent-color: #2563eb;
-    background: rgba(0, 0, 0, 0.45);
-    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.55);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.7);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1;
+    color: transparent;
+    user-select: none;
+}
+
+.quickmove-check::after {
+    content: "\2713";
+}
+
+.quickmove-check:hover {
+    border-color: #60a5fa;
+}
+
+.quickmove-check.checked {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
 }
 
 /* QuickMove tab */
@@ -28,9 +50,10 @@ input.quickmove-check {
     margin-left: 6px;
 }
 
-.quickmove-summary {
-    margin: 6px 0;
-    opacity: 0.8;
+.quickmove-hint {
+    margin: 2px 0 8px 0;
+    opacity: 0.75;
+    font-size: 0.9em;
 }
 
 .quickmove-empty {
@@ -100,20 +123,24 @@ input.quickmove-check {
     margin-top: 8px;
 }
 
+/* clickable card: click toggles include/exclude */
 .quickmove-card {
     width: 210px;
-    border: 1px solid var(--border-color-primary, #444);
+    border: 2px solid #2563eb;
     border-radius: 8px;
     padding: 6px;
-    transition: opacity 0.15s ease;
+    cursor: pointer;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+    user-select: none;
+}
+
+.quickmove-card:hover {
+    border-color: #60a5fa;
 }
 
 .quickmove-card.unchecked {
     opacity: 0.45;
-}
-
-.quickmove-card.unchecked .quickmove-tab-check {
-    cursor: pointer;
+    border-color: var(--border-color-primary, #444);
 }
 
 .quickmove-card img {
@@ -122,6 +149,7 @@ input.quickmove-check {
     object-fit: contain;
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.2);
+    pointer-events: none;
 }
 
 .quickmove-card-label {
@@ -129,16 +157,22 @@ input.quickmove-check {
     align-items: center;
     gap: 6px;
     margin-top: 6px;
-    cursor: pointer;
     font-size: 0.85em;
 }
 
-.quickmove-card-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+.quickmove-badge {
     flex-shrink: 0;
-    accent-color: #2563eb;
-    cursor: pointer;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 0.78em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.quickmove-card.unchecked .quickmove-badge {
+    background: #6b7280;
 }
 
 .quickmove-card-name {

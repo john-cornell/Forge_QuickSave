@@ -1,15 +1,19 @@
-// QuickMove v1.3.0
-// JS owns ALL checkbox rendering. One source of truth: `state`, mirrored from
-// the backend. Checkboxes are simple: click to toggle on/off, no flicker.
+// QuickMove v1.4.0
+// Preview: a self-drawn check button (NOT a native checkbox) overlaid on each
+// gallery thumbnail. We fully own its state and rendering, so Gradio can
+// never swallow the click or reset the tick. Click toggles on/off.
+//
+// Tab: no checkboxes. Click an image card to include/exclude it from the
+// move. Excluded cards grey out but stay listed until "Clear Unchecked".
 //
 // Three states per image path:
-//   (not in state)  default — unchecked on preview, not shown on tab
-//   checked=true    selected for move — checked on preview and tab
-//   checked=false   remembered — unchecked + greyed on tab, unchecked on preview
+//   (not in state)  default — no tick on preview, not shown on tab
+//   checked=true    will move — tick on preview, normal card on tab
+//   checked=false   remembered/excluded — no tick, greyed card on tab
 (function () {
     "use strict";
 
-    const QM_VERSION = "1.3.0";
+    const QM_VERSION = "1.4.0";
     const GALLERY_IDS = ["txt2img_gallery", "img2img_gallery"];
 
     // normKey -> {path, key, checked, name, url, missing}
@@ -28,6 +32,11 @@
     function extractPath(img) {
         const m = (img.src || "").match(/[/=]file=([^?#]+)/);
         return m ? decodeURIComponent(m[1]) : null;
+    }
+
+    function isChecked(path) {
+        const it = state[normKey(path)];
+        return !!(it && it.checked);
     }
 
     // ------------------------------------------------------------- backend
@@ -71,20 +80,40 @@
         }).catch(() => {});
     }
 
-    // ------------------------------------------- gallery (txt2img/img2img)
-
-    function isChecked(path) {
-        const it = state[normKey(path)];
-        return !!(it && it.checked);
+    // Toggle from anywhere (preview button or tab card): updates state,
+    // backend, every preview button, and the tab card in one place.
+    function toggle(path) {
+        const newVal = !isChecked(path);
+        sendToggle(path, newVal);
+        syncGallery();
+        updateTabCard(normKey(path), newVal);
+        return newVal;
     }
 
-    function onGalleryToggle(e) {
+    // ------------------------------------------- gallery (txt2img/img2img)
+
+    function swallow(e) {
+        e.preventDefault();
         e.stopPropagation();
-        const cb = e.target;
-        const path = cb.dataset.qmPath;
-        if (!path) return;
-        sendToggle(path, cb.checked);
-        updateTabCard(normKey(path), cb.checked);
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    }
+
+    function makeCheckButton() {
+        const btn = document.createElement("div");
+        btn.className = "quickmove-check";
+        btn.title = "QuickMove: click to mark/unmark this image for batch move";
+        // Block every event the gallery might use, then toggle on click.
+        ["pointerdown", "pointerup", "mousedown", "mouseup", "touchstart"].forEach(
+            (ev) => btn.addEventListener(ev, (e) => e.stopPropagation())
+        );
+        btn.addEventListener("click", (e) => {
+            swallow(e);
+            const path = btn.dataset.qmPath;
+            if (!path) return;
+            const newVal = toggle(path);
+            btn.classList.toggle("checked", newVal);
+        });
+        return btn;
     }
 
     // Idempotent: only writes to the DOM when something actually changed,
@@ -100,27 +129,28 @@
                 const path = extractPath(img);
                 if (!path) return;
 
-                let cb = thumb.querySelector("input.quickmove-check");
-                if (!cb) {
-                    cb = document.createElement("input");
-                    cb.type = "checkbox";
-                    cb.className = "quickmove-check";
-                    cb.title = "QuickMove: keep this image for batch move";
-                    cb.addEventListener("click", (e) => e.stopPropagation());
-                    cb.addEventListener("change", onGalleryToggle);
+                let btn = thumb.querySelector(".quickmove-check");
+                if (!btn) {
+                    btn = makeCheckButton();
                     if (getComputedStyle(thumb).position === "static") {
                         thumb.style.position = "relative";
                     }
-                    thumb.appendChild(cb);
+                    thumb.appendChild(btn);
                 }
-                if (cb.dataset.qmPath !== path) cb.dataset.qmPath = path;
+                if (btn.dataset.qmPath !== path) btn.dataset.qmPath = path;
                 const want = isChecked(path);
-                if (cb.checked !== want) cb.checked = want;
+                if (btn.classList.contains("checked") !== want) {
+                    btn.classList.toggle("checked", want);
+                }
             });
         }
     }
 
     // ---------------------------------------------------- QuickMove tab UI
+
+    function badgeText(checked) {
+        return checked ? "\u2713 will move" : "excluded";
+    }
 
     function updateTabCard(key, checked) {
         const card = gradioApp().querySelector(
@@ -128,48 +158,53 @@
         );
         if (!card) return;
         card.classList.toggle("unchecked", !checked);
-        const cb = card.querySelector("input.quickmove-tab-check");
-        if (cb && cb.checked !== checked) cb.checked = checked;
+        const badge = card.querySelector(".quickmove-badge");
+        if (badge) badge.textContent = badgeText(checked);
     }
 
     function buildCard(it) {
         const card = document.createElement("div");
         card.className = "quickmove-card" + (it.checked ? "" : " unchecked");
         card.dataset.qmKey = it.key;
+        card.title = it.path + "\nClick to include/exclude from the move";
 
         const img = document.createElement("img");
         img.src = it.url;
         img.loading = "lazy";
-        img.title = it.path;
         card.appendChild(img);
 
-        const label = document.createElement("label");
-        label.className = "quickmove-card-label";
+        const row = document.createElement("div");
+        row.className = "quickmove-card-label";
 
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.className = "quickmove-tab-check";
-        cb.checked = !!it.checked;
-        cb.addEventListener("change", () => {
-            sendToggle(it.path, cb.checked);
-            card.classList.toggle("unchecked", !cb.checked);
-            syncGallery();
-        });
-        label.appendChild(cb);
+        const badge = document.createElement("span");
+        badge.className = "quickmove-badge";
+        badge.textContent = badgeText(!!it.checked);
+        row.appendChild(badge);
 
         const name = document.createElement("span");
         name.className = "quickmove-card-name";
         name.textContent = it.name;
-        label.appendChild(name);
+        row.appendChild(name);
 
         if (it.missing) {
             const miss = document.createElement("span");
             miss.className = "quickmove-missing";
             miss.textContent = "missing";
-            label.appendChild(miss);
+            row.appendChild(miss);
         }
 
-        card.appendChild(label);
+        card.appendChild(row);
+
+        card.addEventListener("click", (e) => {
+            swallow(e);
+            const included = !card.classList.contains("unchecked");
+            const target = !included;
+            sendToggle(it.path, target);
+            card.classList.toggle("unchecked", !target);
+            badge.textContent = badgeText(target);
+            syncGallery();
+        });
+
         return card;
     }
 
@@ -205,7 +240,7 @@
 
         const title = document.createElement("span");
         title.textContent =
-            "Images (" + items.length + " listed, " + checkedCount + " checked)";
+            "Images (" + items.length + " listed, " + checkedCount + " will move)";
         header.appendChild(title);
 
         const body = document.createElement("div");
@@ -217,12 +252,19 @@
             saveAccordionState(open);
         });
 
+        const hint = document.createElement("div");
+        hint.className = "quickmove-hint";
+        hint.textContent =
+            "Click an image to include/exclude it from the move. Greyed images " +
+            "are excluded and stay here until you press 'Clear Unchecked'.";
+        body.appendChild(hint);
+
         if (!items.length) {
             const empty = document.createElement("div");
             empty.className = "quickmove-empty";
             empty.textContent =
-                "No images selected yet. Tick the checkbox on generated images " +
-                "in the txt2img / img2img galleries to add them here.";
+                "No images selected yet. Click the check button on generated " +
+                "images in the txt2img / img2img galleries to add them here.";
             body.appendChild(empty);
         } else {
             const grid = document.createElement("div");
