@@ -24,7 +24,7 @@ from fastapi import Body
 
 from modules import script_callbacks
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(EXT_DIR, "quickmove_config.json")
@@ -200,8 +200,10 @@ def on_ui_tabs():
             f"<span class='quickmove-version'>v{VERSION}</span></div>"
         )
         with gr.Row():
+            # Callable value: Gradio re-evaluates it on every page load, so
+            # the saved folder reappears after a browser refresh.
             dest_box = gr.Textbox(
-                value=get_destination(),
+                value=get_destination,
                 label="Destination folder (persistent)",
                 placeholder=r"e.g. C:\Pictures\Keepers",
                 scale=4,
@@ -229,7 +231,10 @@ def on_ui_tabs():
         clear_unchecked_btn.click(lambda: _status(clear_unchecked()), outputs=[status])
         uncheck_all_btn.click(lambda: _status(uncheck_all()), outputs=[status])
         clear_all_btn.click(lambda: _status(clear_all()), outputs=[status])
-        refresh_btn.click(lambda: _status("Refreshed."), outputs=[status])
+        refresh_btn.click(
+            lambda: (_status("Refreshed."), get_destination()),
+            outputs=[status, dest_box],
+        )
 
     return [(ui, "QuickMove", "quickmove_tab")]
 

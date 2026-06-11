@@ -1,4 +1,4 @@
-# QuickMove (v1.5.0)
+# QuickMove (v1.5.1)
 
 A Stable Diffusion WebUI **Forge** / A1111 extension that lets you tick generated
 images as they appear and later move all ticked images to a folder of your
@@ -59,5 +59,5 @@ registered).
 
 ## Version
 
-Version **1.5.0** — shown at the top of the QuickMove tab and logged to the
+Version **1.5.1** — shown at the top of the QuickMove tab and logged to the
 browser console and Forge console on load.

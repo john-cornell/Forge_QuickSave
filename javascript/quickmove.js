@@ -1,4 +1,4 @@
-// QuickMove v1.5.0
+// QuickMove v1.5.1
 // Preview: a self-drawn check button (NOT a native checkbox) overlaid on each
 // gallery thumbnail. We fully own its state and rendering, so Gradio can
 // never swallow the click or reset the tick. Click toggles on/off.
@@ -13,7 +13,7 @@
 (function () {
     "use strict";
 
-    const QM_VERSION = "1.5.0";
+    const QM_VERSION = "1.5.1";
     const GALLERY_IDS = ["txt2img_gallery", "img2img_gallery"];
 
     // normKey -> {path, key, checked, name, url, missing}
